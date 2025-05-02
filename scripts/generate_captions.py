@@ -38,7 +38,16 @@ def get_prompt():
     """
     Returns a refined, contextual, image-grounded prompt.
     """
-    pass
+    return (
+        "Generate a factual, neutral, and descriptive caption of the image. "
+        "Describe only what is visibly present (furniture, material, color, possible context), "
+        "without any promotional language, focusing on the main product. "
+        "Write a single concise noun phrase that captures the essential details without overlooking "
+        "important and specific features of the furniture (e.g., type, colors, comments on size, shape, "
+        "material, set, quantity, etc.). "
+        "Do not describe decorative elements or background details that are not part of the furniture; "
+        "focus solely on the visible piece or set of furniture."
+    )
 # --------------------------- SAVE PARTIAL CAPTIONS ---------------------------
 def save_partial(output_path, part_index, prompt, results):
     part_file = f"{output_path}.part{part_index}.json"
@@ -78,25 +87,14 @@ def merge_caption_parts(base_path, output_file, delete_parts=True, save_csv=Fals
     if save_csv:
         csv_path = output_file.replace(".json", ".csv")
         with open(csv_path, 'w', encoding='utf-8', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=["id", "label", "caption"])
+            writer = csv.DictWriter(f, fieldnames=["id", "caption"])
             writer.writeheader()
             for item in all_captions:
                 writer.writerow({
                     "id": item["id"],
-                    "label": item["label"],
                     "caption": item["caption"]
                 })
         logger.info(f"📄 CSV file saved → {csv_path}")
-
-    # Optional: Save label summary
-    if save_summary:
-        label_counter = Counter([item["label"] for item in all_captions if item["caption"]])
-        summary_path = output_file.replace(".json", "_summary.txt")
-        with open(summary_path, 'w', encoding='utf-8') as f:
-            f.write("📊 Label summary:\n")
-            for label, count in label_counter.most_common():
-                f.write(f"{label}: {count} samples\n")
-        logger.info(f"📊 Summary file saved → {summary_path}")
 
     # Delete part files
     if delete_parts:
@@ -136,30 +134,27 @@ def generate_captions(dataset_path, output_path, max_samples=None, save_every=50
         
     results = []
     part_index = start_index // save_every
-    prompt_base = None
+    prompt = get_prompt()
+    prompt_base = prompt
+    logger.info(f"📝 Using prompt: {prompt}")
 
     for i, example in enumerate(tqdm(dataset, desc="Furnitures Captions", initial=start_index, total=original_total), start=start_index):
         # if i < start_index:
         #     continue
         id = example['id']
         image = example['image']
-        prompt = get_prompt()
-
-        if prompt_base is None:
-            prompt_base = prompt
+        
 
         try:
             caption = describe_image(prompt, image=image, show_image=False)
             results.append({
                 "id": id,
-                "prompt": prompt,
                 "caption": caption
             })
         except Exception as e:
             logger.error(f"❌ Failed to generate caption for image ID={id}: {e}")
             results.append({
                 "id": id,
-                "prompt": prompt,
                 "caption": None
             })
 
@@ -189,5 +184,10 @@ def generate_captions(dataset_path, output_path, max_samples=None, save_every=50
     
 # --------------------------- RUN ---------------------------
 if __name__ == "__main__":
-
-    pass
+    
+    generate_captions(
+        dataset_path="data/raw/furniture_ds",
+        output_path="data/captions/furnitures_captions",
+        max_samples=None,
+        save_every=500
+    )
